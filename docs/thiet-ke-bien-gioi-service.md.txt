@@ -1,0 +1,19 @@
+1. Danh sách Service & Thành phần
+- api-gateway (8080): Điểm vào duy nhất, định tuyến (RewritePath), xác thực sơ bộ (AuthHeaderFilter), CORS.
+- auth-service (8081, auth_db): Quản lý User/Student, đăng nhập, phát hành và xác thực JWT (phân quyền ROLE_ADMIN, ROLE_STUDENT).
+- course-service (8082, course_db): Quản lý Course, tìm kiếm, phân trang, CRUD môn học (yêu cầu ROLE_ADMIN), quản lý số chỗ (reserve/release seat).
+- registration-service (8083, registration_db): Quản lý Registration, gọi REST nội bộ sang course-service để giữ chỗ.
+- crs-frontend (5174/5173): Giao diện React SPA, kết nối qua Gateway, tìm kiếm debounce, phân trang, Form CRUD môn học (Controlled Component), tự động đính kèm JWT Token, điều hướng trang qua React Router, bảo vệ trang bằng ProtectedRoute theo Role, tự động xử lý token hết hạn (Axios Interceptor 401), xử lý 4 trạng thái (Loading, Success, Empty, Error) và tự đồng bộ lại dữ liệu sau thao tác.
+
+2. Nguyên tắc sở hữu dữ liệu
+- Database-per-Service: Mỗi service sở hữu database riêng biệt (auth_db, course_db, registration_db).
+- Tuyệt đối KHÔNG truy cập trực tiếp hoặc join chéo DB của service khác.
+- Trao đổi hoặc thay đổi dữ liệu liên service bắt buộc phải gọi qua REST API hoặc đường dẫn nội bộ (/internal/**).
+
+3. Phân luồng bảo mật tại Gateway
+- Public: /api/auth/login, GET /api/courses (xem & tìm kiếm môn học).
+- Protected (Bearer JWT): 
+  + /api/registrations (đăng ký học phần cho sinh viên, yêu cầu ROLE_STUDENT)
+  + POST /api/courses, PUT /api/courses/{id}, DELETE /api/courses/{id} (quản lý môn học, yêu cầu ROLE_ADMIN)
+- Partner (API Key): /api/public/courses (xác thực qua Header X-API-KEY).
+- Internal: /internal/courses/** (chỉ gọi nội bộ giữa các service, không mở qua Gateway).
