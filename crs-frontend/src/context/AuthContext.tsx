@@ -1,0 +1,61 @@
+import { createContext, useContext, useState, type ReactNode } from 'react';
+import type { LoginResponse } from '../types/auth';
+
+interface AuthUser {
+    id: number; // Bổ sung id người dùng
+    username: string;
+    role: 'ADMIN' | 'STUDENT';
+}
+
+interface AuthContextValue {
+    user: AuthUser | null;
+    login: (data: LoginResponse) => void;
+    logout: () => void;
+    isAuthenticated: boolean;
+}
+
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
+const TOKEN_KEY = 'crs_token';
+const USER_KEY = 'crs_user';
+
+export function AuthProvider({ children }: { children: ReactNode }) {
+    // Khởi tạo state trực tiếp từ localStorage để không bị trễ khi F5
+    const [user, setUser] = useState<AuthUser | null>(() => {
+        const savedUser = localStorage.getItem(USER_KEY);
+        const savedToken = localStorage.getItem(TOKEN_KEY);
+        if (savedUser && savedToken) {
+            try {
+                return JSON.parse(savedUser);
+            } catch {
+                return null;
+            }
+        }
+        return null;
+    });
+
+    const login = (data: LoginResponse) => {
+        localStorage.setItem(TOKEN_KEY, data.token);
+        // Lưu cả id nhận được từ API vào AuthUser
+        const authUser: AuthUser = { id: data.userId, username: data.username, role: data.role };
+        localStorage.setItem(USER_KEY, JSON.stringify(authUser));
+        setUser(authUser);
+    };
+
+    const logout = () => {
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(USER_KEY);
+        setUser(null);
+    };
+
+    return (
+        <AuthContext.Provider value={{ user, login, logout, isAuthenticated: !!user }}>
+            {children}
+        </AuthContext.Provider>
+    );
+}
+
+export function useAuth() {
+    const ctx = useContext(AuthContext);
+    if (!ctx) throw new Error('useAuth phai duoc dung ben trong AuthProvider');
+    return ctx;
+}

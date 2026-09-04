@@ -1,0 +1,36 @@
+1. api-gateway (cổng 8080 - Cổng tiếp nhận và định tuyến tập trung)
+- /api/auth/** -> Chuyển tiếp tới auth-service:8081 (/auth/**)
+- /api/courses -> Chuyển tiếp tới course-service:8082 (/courses)
+- /api/courses/** -> Chuyển tiếp tới course-service:8082 (/courses/**)
+- /api/registrations -> Chuyển tiếp tới registration-service:8083 (/registrations)
+- /api/registrations/** -> Chuyển tiếp tới registration-service:8083 (/registrations/**)
+- /api/public/courses -> Chuyển tiếp tới course-service:8082 (/courses, xác thực X-API-KEY)
+- AuthHeaderFilter: Kiểm tra Bearer JWT với các route bảo vệ, bỏ qua Login và GET /api/courses
+
+2. auth-service (cổng 8081, tiền tố Gateway: /api/auth)
+- POST /auth/login : Đăng nhập tài khoản, trả về JWT token và thông tin quyền người dùng (Role: ADMIN / STUDENT)
+
+3. course-service (cổng 8082, tiền tố Gateway: /api/courses)
+- GET /courses : Danh sách môn học, tìm kiếm theo keyword, phân trang (page, size)
+- GET /courses/{id} : Xem chi tiết một môn học
+- POST /courses : Thêm môn học mới (cần JWT + Quyền ADMIN)
+- PUT /courses/{id} : Cập nhật môn học (cần JWT + Quyền ADMIN)
+- DELETE /courses/{id} : Xóa môn học (cần JWT + Quyền ADMIN)
+- PATCH /internal/courses/{id}/reserve-seat : Giữ chỗ, trừ số lượng chỗ trống (gọi nội bộ)
+- PATCH /internal/courses/{id}/release-seat : Nhả chỗ, hoàn lại chỗ trống khi hủy (gọi nội bộ)
+- GET /api/public/courses : API cung cấp cho đối tác (yêu cầu X-API-KEY)
+
+4. registration-service (cổng 8083, tiền tố Gateway: /api/registrations)
+- POST /registrations : Đăng ký môn học (cần JWT + Quyền STUDENT, gọi sang course-service để giữ chỗ)
+- GET /registrations/student/{studentId} : Danh sách môn học đã đăng ký theo sinh viên
+
+5. crs-frontend (cổng 5174/5173 - Giao diện người dùng)
+- Axios Client & Interceptors: Đính kèm Bearer JWT tự động từ localStorage vào Authorization Header; bắt lỗi 401 Unauthorized để tự động xóa token và chuyển về /login.
+- AuthContext: Quản lý trạng thái xác thực toàn cục, đọc localStorage lúc khởi tạo state để duy trì phiên làm việc khi F5.
+- ProtectedRoute (Route Guard): Bảo vệ các tuyến đường riêng tư, tự động điều hướng theo Role (ADMIN/STUDENT).
+- Cấu trúc Trang (Pages):
+  + /login: Màn hình đăng nhập hệ thống.
+  + /courses: Tra cứu danh sách môn học công khai (keyword, page, size) - Ẩn cột Thao tác.
+  + /admin/courses: Trang quản trị dành riêng cho Admin (Thêm/Sửa/Xóa môn học).
+  + /register-course: Màn hình đăng ký học phần dành cho Sinh viên.
+- UI & State Sync: Tái sử dụng CourseForm (Thêm/Sửa), xử lý 4 trạng thái (Loading/Success/Empty/Error), hiển thị lỗi ApiErrorResponse và refetch danh sách tự động sau CRUD.
